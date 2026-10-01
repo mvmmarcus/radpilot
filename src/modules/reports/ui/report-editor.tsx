@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { GeneratedReportSchema } from "@/modules/ai";
 import type { SectionKey, Template } from "@/modules/templates";
 import { GENERATION_ID_HEADER } from "../application/generate-constants";
-import { setAiSection, type ReportContent } from "../domain/content";
+import { combineGeneratedText, setAiSection, type ReportContent } from "../domain/content";
 import { AiPendingMark } from "./tiptap/ai-pending-mark";
 import { reportContentToTiptapDoc, tiptapDocToReportContent } from "./tiptap/content-mapping";
 import { MacroExpansionExtension } from "./tiptap/macro-expansion-extension";
@@ -71,6 +71,9 @@ export function ReportEditor({
   const [content, setContentState] = useState(initialContent);
   const [shorthand, setShorthand] = useState("");
   const generationIdRef = useRef<string | null>(null);
+  // Text each section held before it was first overwritten by a draft, so a
+  // draft (or a regenerate) adds to it instead of destroying it.
+  const keptTextRef = useRef<Partial<Record<SectionKey, string>>>({});
 
   const setContent = useCallback(
     (next: ReportContent) => {
@@ -130,7 +133,9 @@ export function ReportEditor({
     if (!object) return;
     let next = contentRef.current;
     for (const key of AI_ASSISTED_SECTIONS) {
-      const text = partialSectionText(object[key]);
+      const generated = partialSectionText(object[key]);
+      if (generated === null) continue;
+      const text = combineGeneratedText(key, generated, keptTextRef.current[key]);
       if (text !== null) next = setAiSection(next, key, text, generationIdRef.current);
     }
     if (next !== contentRef.current) {
@@ -144,6 +149,10 @@ export function ReportEditor({
 
   const handleGenerate = useCallback(() => {
     if (!examContext) return;
+    for (const key of AI_ASSISTED_SECTIONS) {
+      const section = contentRef.current.sections[key];
+      if (section?.source !== "ai") keptTextRef.current[key] = section?.text ?? "";
+    }
     submit({
       reportId: reportId ?? null,
       sections: template.sections
@@ -195,8 +204,8 @@ export function ReportEditor({
   return (
     <div className="flex flex-col gap-4">
       {examContext && (
-        <div className="flex items-end gap-2">
-          <label className="flex-1 text-sm">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="min-w-64 flex-1 text-sm">
             <span className="mb-1 block text-muted-foreground">Shorthand</span>
             <input
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
