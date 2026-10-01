@@ -33,6 +33,8 @@ export interface CopilotPanelProps {
   onApplyFix?: (issue: CopilotIssue) => void;
   /** Called when the radiologist dismisses a non-blocking issue. Not offered for blocking issues. */
   onDismiss?: (issue: CopilotIssue) => void;
+  /** Called when the radiologist acknowledges a blocking issue that has no fix (a communicated critical finding). */
+  onAcknowledge?: (issue: CopilotIssue) => void;
   className?: string;
 }
 
@@ -41,7 +43,7 @@ export interface CopilotPanelProps {
  * while any critical/blocking issue is open, one-click fix for issues that
  * have a suggestedFix, and dismiss for non-blocking issues.
  */
-export function CopilotPanel({ issues, onApplyFix, onDismiss, className }: CopilotPanelProps) {
+export function CopilotPanel({ issues, onApplyFix, onDismiss, onAcknowledge, className }: CopilotPanelProps) {
   const open = issues.filter((i) => !i.resolved);
   const blockingOpen = open.filter((i) => isBlockingOpen(i));
   const grouped = ISSUE_SEVERITIES.map((severity) => ({
@@ -81,7 +83,7 @@ export function CopilotPanel({ issues, onApplyFix, onDismiss, className }: Copil
         <ScrollArea className="-mx-1 flex-1 px-1">
           <div className="flex flex-col gap-3">
             {grouped.map((group) => (
-              <IssueGroup key={group.severity} severity={group.severity} issues={group.items} onApplyFix={onApplyFix} onDismiss={onDismiss} />
+              <IssueGroup key={group.severity} severity={group.severity} issues={group.items} onApplyFix={onApplyFix} onDismiss={onDismiss} onAcknowledge={onAcknowledge} />
             ))}
           </div>
         </ScrollArea>
@@ -95,11 +97,13 @@ function IssueGroup({
   issues,
   onApplyFix,
   onDismiss,
+  onAcknowledge,
 }: {
   severity: IssueSeverity;
   issues: CopilotIssue[];
   onApplyFix?: (issue: CopilotIssue) => void;
   onDismiss?: (issue: CopilotIssue) => void;
+  onAcknowledge?: (issue: CopilotIssue) => void;
 }) {
   return (
     <div data-slot="copilot-issue-group" className="flex flex-col gap-2">
@@ -108,7 +112,7 @@ function IssueGroup({
         <span>{issues.length}</span>
       </div>
       {issues.map((issue) => (
-        <IssueCard key={issue.id} issue={issue} onApplyFix={onApplyFix} onDismiss={onDismiss} />
+        <IssueCard key={issue.id} issue={issue} onApplyFix={onApplyFix} onDismiss={onDismiss} onAcknowledge={onAcknowledge} />
       ))}
     </div>
   );
@@ -118,10 +122,12 @@ function IssueCard({
   issue,
   onApplyFix,
   onDismiss,
+  onAcknowledge,
 }: {
   issue: CopilotIssue;
   onApplyFix?: (issue: CopilotIssue) => void;
   onDismiss?: (issue: CopilotIssue) => void;
+  onAcknowledge?: (issue: CopilotIssue) => void;
 }) {
   const blocking = isBlockingOpen(issue);
   return (
@@ -142,6 +148,12 @@ function IssueCard({
             <Button size="xs" variant="outline" onClick={() => onApplyFix(issue)}>
               <Check data-icon="inline-start" />
               Fix
+            </Button>
+          )}
+          {blocking && !issue.suggestedFix && onAcknowledge && (
+            <Button size="xs" variant="outline" onClick={() => onAcknowledge(issue)}>
+              <Check data-icon="inline-start" />
+              Acknowledge
             </Button>
           )}
           {!blocking && onDismiss && (

@@ -37,6 +37,18 @@ export class SupabaseReportRepository implements ReportRepository {
     return toReport(data);
   }
 
+  /** Flags the report as carrying a critical finding. Returns the updated row (new version). */
+  async markCritical(id: string): Promise<Report> {
+    const { data, error } = await this.client
+      .from("reports")
+      .update({ is_critical: true })
+      .eq("id", id)
+      .select("*")
+      .single();
+    if (error) throw new Error(`Failed to flag report ${id} as critical: ${error.message}`);
+    return toReport(data);
+  }
+
   async saveContent(id: string, expectedVersion: number, content: ReportContent): Promise<Report> {
     const { data, error } = await this.client
       .from("reports")

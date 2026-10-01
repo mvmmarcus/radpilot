@@ -22,6 +22,10 @@ class InMemoryIssueRepository implements CopilotIssueRepository {
     return this.issues.filter((i) => i.reportId === reportId && !i.resolved);
   }
 
+  async listResolvedIssues(reportId: string): Promise<CopilotIssue[]> {
+    return this.issues.filter((i) => i.reportId === reportId && i.resolved);
+  }
+
   async replaceOpenIssues(reportId: string, drafts: CopilotIssueDraft[]): Promise<CopilotIssue[]> {
     this.issues = this.issues.filter((i) => i.reportId !== reportId || i.resolved);
     const fresh: CopilotIssue[] = drafts.map((draft) => ({
@@ -134,6 +138,22 @@ describe("CopilotService.dismiss", () => {
     expect(audit.events).toHaveLength(1);
   });
 
+  it("does not raise a dismissed issue again on the next run", async () => {
+    const repo = new InMemoryIssueRepository();
+    const service = new CopilotService(repo, mockCopilotReviewer, new InMemoryAuditRecorder());
+
+    const content = contentWith({
+      findings: "1. 8mm solid nodule in the right lower lobe.",
+      impression: "1. No acute cardiopulmonary abnormality.",
+    });
+    const first = await service.run({ ...baseInput, content });
+    const warning = first.issues.find((i) => i.severity === "warning")!;
+    await service.dismiss(warning, "user-1");
+
+    const second = await service.run({ ...baseInput, content });
+    expect(second.issues.filter((i) => !i.resolved && i.message === warning.message)).toEqual([]);
+  });
+
   it("refuses to dismiss a blocking issue", async () => {
     const repo = new InMemoryIssueRepository();
     const audit = new InMemoryAuditRecorder();
@@ -144,5 +164,28 @@ describe("CopilotService.dismiss", () => {
     const blocking = result.issues[0];
 
     await expect(service.dismiss(blocking, "user-1")).rejects.toThrow(/cannot be dismissed/i);
+  });
+});
+
+describe("CopilotService.acknowledge", () => {
+  it("resolves a critical finding, audits it, and keeps it resolved on the next run", async () => {
+    const repo = new InMemoryIssueRepository();
+    const audit = new InMemoryAuditRecorder();
+    const service = new CopilotService(repo, mockCopilotReviewer, audit);
+
+    const content = contentWith({ findings: "Pneumothorax on the left.", impression: "Left pneumothorax." });
+    const first = await service.run({ ...baseInput, content });
+    expect(first.hasBlockingOpen).toBe(true);
+
+    await service.acknowledge(first.issues.find((i) => i.severity === "blocking")!, "user-1");
+    expect(audit.events).toHaveLength(1);
+
+    const second = await service.run({ ...baseInput, content });
+    expect(second.hasBlockingOpen).toBe(false);
+  });
+
+  it("refuses to acknowledge a non-blocking issue", async () => {
+    const service = new CopilotService(new InMemoryIssueRepository(), mockCopilotReviewer, new InMemoryAuditRecorder());
+    await expect(service.acknowledge({ id: "x", severity: "warning" }, "user-1")).rejects.toThrow(/dismiss/i);
   });
 });

@@ -105,6 +105,16 @@ export function ReportEditor({
     [editor, template],
   );
 
+  // Adopt content changed outside the editor (a viewer measurement, a copilot
+  // fix). Our own edits come back through the parent as the same object, so
+  // they are skipped here.
+  useEffect(() => {
+    if (!editor || initialContent === contentRef.current) return;
+    contentRef.current = initialContent;
+    setContentState(initialContent);
+    replaceDoc(initialContent);
+  }, [editor, initialContent, replaceDoc]);
+
   const { object, submit, isLoading, error } = useObject({
     api: generateApi,
     schema: GeneratedReportSchema,

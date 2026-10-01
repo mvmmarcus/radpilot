@@ -25,6 +25,16 @@ export class SupabaseCopilotIssueRepository implements CopilotIssueRepository {
     return (data ?? []).map(toCopilotIssue);
   }
 
+  async listResolvedIssues(reportId: string): Promise<CopilotIssue[]> {
+    const { data, error } = await this.client
+      .from("copilot_issues")
+      .select("*")
+      .eq("report_id", reportId)
+      .eq("resolved", true);
+    if (error) throw new Error(`Failed to list resolved copilot issues: ${error.message}`);
+    return (data ?? []).map(toCopilotIssue);
+  }
+
   async replaceOpenIssues(reportId: string, drafts: CopilotIssueDraft[]): Promise<CopilotIssue[]> {
     const { error: deleteError } = await this.client
       .from("copilot_issues")

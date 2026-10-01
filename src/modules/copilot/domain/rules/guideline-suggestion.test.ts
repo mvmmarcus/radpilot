@@ -38,6 +38,21 @@ describe("guideline-suggestion rule (Fleischner)", () => {
     expect(issues[0].message).toBe("Fleischner 2017: CT at 6-12 months, then at 18-24 months.");
   });
 
+  it("does nothing once the recommendation is already in Recommendations", () => {
+    const content = contentWith({
+      clinical_indication: "Incidental nodule, non-smoker.",
+      findings: "8 mm solid nodule in the right lower lobe.",
+    });
+    const [issue] = guidelineSuggestionRule.run({ ...baseCtx, content });
+    const fix = issue.suggestedFix as { text: string };
+    const applied = contentWith({
+      clinical_indication: "Incidental nodule, non-smoker.",
+      findings: "8 mm solid nodule in the right lower lobe.",
+      recommendations: `Clinical correlation.\n${fix.text}`,
+    });
+    expect(guidelineSuggestionRule.run({ ...baseCtx, content: applied })).toEqual([]);
+  });
+
   it("does nothing when there is no nodule mentioned", () => {
     const content = contentWith({ findings: "Lungs are clear." });
     expect(guidelineSuggestionRule.run({ ...baseCtx, content })).toEqual([]);

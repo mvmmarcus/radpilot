@@ -41,6 +41,9 @@ function run(ctx: RuleContext): CopilotIssueDraft[] {
     : "low";
 
   const recommendation = fleischnerRecommendation({ sizeMm, multiple, risk });
+  const recommendationsText = ctx.content.sections.recommendations?.text ?? "";
+  if (recommendationsText.toLowerCase().includes(recommendation.followUpText.toLowerCase())) return [];
+
   const span = findSpan("findings", findingsText, /\bnodules?\b/i);
 
   return [
