@@ -5,6 +5,7 @@
  * `dicom` Storage bucket with the service role. Object keys mirror the local
  * layout, e.g. ct-chest-phantom/0001.dcm and ct-chest-phantom/manifest.json,
  * which matches studies.dicom_path. Re-running overwrites (upsert).
+ * Defaults to .env.local; pass `-- --env <file>` for the hosted project.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -20,8 +21,12 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 function loadEnv() {
-  for (const file of [".env.local", ".env"]) {
+  // `npm run dicom:upload -- --env .env.production.local` targets another project.
+  const args = process.argv.slice(2);
+  const files = args.includes("--env") ? [args[args.indexOf("--env") + 1]] : [".env.local", ".env"];
+  for (const file of files) {
     if (existsSync(file)) process.loadEnvFile(file);
+    else if (args.includes("--env")) throw new Error(`${file} not found`);
   }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

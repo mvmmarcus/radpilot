@@ -66,6 +66,9 @@ pulmonary artery filling defect and an 8 mm right lower lobe nodule, a head CT w
 right subdural hematoma, and normal and pneumothorax chest radiographs) and written by
 a small dependency-free DICOM Part 10 writer (`scripts/dicom/part10-writer.ts`).
 
+Full walkthrough (local Supabase, OpenAI, hosted Supabase, Vercel) with a check after each
+stage: [docs/setup.md](docs/setup.md). `npm run verify:setup` tells you what's missing.
+
 ## Scripts
 
 | Script | What it does |
@@ -75,6 +78,7 @@ a small dependency-free DICOM Part 10 writer (`scripts/dicom/part10-writer.ts`).
 | `npm run test:e2e` | Playwright (starts the dev server) |
 | `npm run eval` | AI eval suite (Session 5) |
 | `npm run db:start` / `db:stop` / `db:reset` | local Supabase (reset re-applies migrations + seed) |
+| `npm run verify:setup` | check env, Supabase, seed, DICOM storage and OpenAI (`-- --env <file>`, `-- --live-ai`) |
 | `npm run db:types` | regenerate `src/lib/supabase/database.types.ts` |
 | `npm run dicom:generate` / `dicom:upload` | write the phantom DICOM series / upload them to Storage |
 
