@@ -146,17 +146,51 @@ export function ReadingRoom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const scheduleAutosave = useCallback((nextContent: ReportContent) => {
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(async () => {
-      const result = await saveReportContentAction(reportRef.current.id, reportRef.current.version, nextContent);
-      if (result.ok && result.data) {
-        setReport(result.data);
-      } else if (result.error) {
-        toast.error("Autosave failed", { description: result.error });
-      }
-    }, AUTOSAVE_DEBOUNCE_MS);
+  // Every write to the report bumps reports.version, and each write must send
+  // the version the previous one returned. So the new version is recorded
+  // synchronously (not on the next render), and saves run one at a time.
+  const applyReport = useCallback((next: Report) => {
+    reportRef.current = next;
+    setReport(next);
   }, []);
+
+  const unsavedContent = useRef<ReportContent | null>(null);
+  const saveChain = useRef<Promise<boolean>>(Promise.resolve(true));
+
+  /**
+   * Saves any unsaved content now, after the save already in flight (if any).
+   * Resolves to false if the save failed. Actions that write the report
+   * (sign, fix, acknowledge...) await this first, so they act on what is on
+   * screen and send a current version.
+   */
+  const flushSave = useCallback(() => {
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+    saveChain.current = saveChain.current.then(async () => {
+      const next = unsavedContent.current;
+      if (!next) return true;
+      unsavedContent.current = null;
+      const result = await saveReportContentAction(reportRef.current.id, reportRef.current.version, next);
+      if (result.ok && result.data) {
+        applyReport(result.data);
+        return true;
+      }
+      toast.error("Autosave failed", { description: result.error });
+      return false;
+    });
+    return saveChain.current;
+  }, [applyReport]);
+
+  const scheduleAutosave = useCallback(
+    (nextContent: ReportContent) => {
+      unsavedContent.current = nextContent;
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = setTimeout(() => void flushSave(), AUTOSAVE_DEBOUNCE_MS);
+    },
+    [flushSave],
+  );
 
   const scheduleCopilot = useCallback(
     (nextContent: ReportContent) => {
@@ -195,6 +229,7 @@ export function ReadingRoom({
     async (issue: CopilotIssue) => {
       if (!issue.suggestedFix) return;
       setBusy(true);
+      await flushSave();
       const result = await applyCopilotFixAction({
         reportId: reportRef.current.id,
         issue: { id: issue.id },
@@ -204,7 +239,7 @@ export function ReadingRoom({
       });
       setBusy(false);
       if (result.ok && result.data) {
-        setReport(result.data);
+        applyReport(result.data);
         setContent(result.data.content);
         setIssues((prev) => prev.filter((i) => i.id !== issue.id));
         void runCopilot(result.data.content);
@@ -212,7 +247,7 @@ export function ReadingRoom({
         toast.error("Could not apply fix", { description: result.error });
       }
     },
-    [runCopilot],
+    [applyReport, flushSave, runCopilot],
   );
 
   const handleDismiss = useCallback(async (issue: CopilotIssue) => {
@@ -228,6 +263,7 @@ export function ReadingRoom({
 
   const handleAcknowledge = useCallback(async (issue: CopilotIssue) => {
     setBusy(true);
+    await flushSave();
     const result = await acknowledgeCopilotIssueAction(reportRef.current.id, {
       id: issue.id,
       severity: issue.severity,
@@ -236,27 +272,33 @@ export function ReadingRoom({
     setBusy(false);
     if (result.ok) {
       // Keep local content: only the version and critical flag change server-side.
-      if (result.data) setReport({ ...result.data, content: contentRef.current });
+      if (result.data) applyReport({ ...result.data, content: contentRef.current });
       setIssues((prev) => prev.filter((i) => i.id !== issue.id));
     } else if (result.error) {
       toast.error("Could not acknowledge issue", { description: result.error });
     }
-  }, []);
+  }, [applyReport, flushSave]);
 
   const handleMarkPreliminary = useCallback(async () => {
     setBusy(true);
+    await flushSave();
     const result = await markPreliminaryAction(reportRef.current.id);
     setBusy(false);
     if (result.ok && result.data) {
-      setReport(result.data);
+      applyReport(result.data);
       toast.success("Marked preliminary");
     } else if (result.error) {
       toast.error("Could not mark preliminary", { description: result.error });
     }
-  }, []);
+  }, [applyReport, flushSave]);
 
   const handleSign = useCallback(async () => {
     setSigning(true);
+    // Sign what is on screen: a report must not be signed with edits still unsaved.
+    if (!(await flushSave())) {
+      setSigning(false);
+      return;
+    }
     const gate = await evaluateSignGateAction(reportRef.current.id);
     if (gate.ok && gate.data && !gate.data.ok) {
       setSigning(false);
@@ -266,24 +308,24 @@ export function ReadingRoom({
     const result = await signReportAction(reportRef.current.id);
     setSigning(false);
     if (result.ok && result.data) {
-      setReport(result.data);
+      applyReport(result.data);
       toast.success("Report signed");
     } else if (result.error) {
       toast.error("Sign failed", { description: result.error });
     }
-  }, []);
+  }, [applyReport, flushSave]);
 
   const handleAmend = useCallback(async () => {
     setBusy(true);
     const result = await amendReportAction(reportRef.current.id);
     setBusy(false);
     if (result.ok && result.data) {
-      setReport(result.data);
+      applyReport(result.data);
       toast.success("Report re-opened for amendment");
     } else if (result.error) {
       toast.error("Could not amend", { description: result.error });
     }
-  }, []);
+  }, [applyReport]);
 
   const hasBlockingOpen = issues.some((i) => !i.resolved && i.severity === "blocking");
   const signableStatus = report.status === "draft" || report.status === "preliminary" || report.status === "amended";
