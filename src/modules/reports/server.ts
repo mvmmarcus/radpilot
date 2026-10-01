@@ -11,3 +11,15 @@ export {
   type ReportRow,
   type ReportVersionRow,
 } from "./infrastructure/mappers";
+
+// Repository port + Supabase implementation.
+export type { ReportRepository, CreateReportInput } from "./application/repository";
+export { ReportVersionConflictError } from "./application/repository";
+export { SupabaseReportRepository } from "./infrastructure/supabase-repository";
+
+// Use cases (create/save; the editor half owned by Track B).
+export { createReport, type CreateReportForStudyInput } from "./application/create-report";
+export { saveReportContent } from "./application/save-report-content";
+
+// Streaming generation route constants, shared between the route handler and the editor.
+export { GENERATION_ID_HEADER } from "./application/generate-constants";
