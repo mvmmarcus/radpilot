@@ -13,3 +13,13 @@ export {
   type StudyRow,
   type WorklistRow,
 } from "./infrastructure/mappers";
+
+// Application ports and use cases.
+export type { StudyRepository, WorklistFilters } from "./application/study-repository";
+export { listWorklist } from "./application/list-worklist";
+export { claimStudy, type ClaimStudyResult } from "./application/claim-study";
+export { releaseStudy, type ReleaseStudyResult } from "./application/release-study";
+export { InMemoryStudyRepository } from "./application/in-memory-study-repository";
+
+// Infrastructure.
+export { SupabaseStudyRepository } from "./infrastructure/supabase-study-repository";
