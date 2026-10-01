@@ -145,8 +145,14 @@ async function checkOpenAI(env: ServerEnv) {
           `AI_MODEL ${env.AI_MODEL} not available to this key`,
           `some available: ${data.map((m) => m.id).filter((id) => /^(gpt|o\d)/.test(id)).slice(0, 8).join(", ")}`,
         );
-    } else if (env.AI_PROVIDER === "openai") {
-      fail("AI_MODEL not set", "set AI_MODEL in the env file to a model id listed for your key");
+    } else {
+      const candidates = data
+        .map((m) => m.id)
+        .filter((id) => /^(gpt-|o\d)/.test(id) && !/(audio|realtime|transcribe|tts|image|search|instruct)/.test(id))
+        .sort();
+      const msg = `AI_MODEL not set. Chat models your key can use:\n      ${candidates.join(", ")}`;
+      if (env.AI_PROVIDER === "openai") fail(msg, "set AI_MODEL in the env file to one of these");
+      else skip(msg);
     }
   } catch (e) {
     fail(`OpenAI check failed: ${errText(e)}`, "check the key at platform.openai.com/api-keys and that billing is set up");
