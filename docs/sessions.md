@@ -112,6 +112,10 @@ Docs session (any time) ───────┘
    your track's minute to avoid filename collisions: A `..._1000_`, B `..._2000_`,
    C `..._3000_`, D `..._4000_` (e.g. `20261002103000_copilot_index.sql`). After any
    migration, run `npm run db:reset && npm run db:types`.
+   **Every new table needs RLS and explicit grants in its migration** (copy the pattern
+   in `20261001000100_rls.sql`: `enable row level security`, then `grant` only the
+   columns each role needs, then policies). The hosted project does not auto-expose new
+   tables, so a missing grant works locally but fails on Vercel.
 5. **New npm packages:** install on your Mac and list them in the PR description, so
    merges don't fight over `package-lock.json`. Merge order A → B → C → D, and
    regenerate the lockfile on conflict (`npm install`).
