@@ -1,0 +1,108 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`toFhirBundle > maps a final report to a valid FHIR R4 Bundle (snapshot) 1`] = `
+{
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:40000000-0000-4000-8000-000000000004",
+      "resource": {
+        "code": {
+          "coding": [
+            {
+              "code": "36643-5",
+              "display": "XR Chest",
+              "system": "http://loinc.org",
+            },
+          ],
+          "text": "XR chest, PA and lateral",
+        },
+        "conclusion": "No acute cardiopulmonary abnormality.",
+        "effectiveDateTime": "2026-09-30T10:00:00.000Z",
+        "id": "40000000-0000-4000-8000-000000000004",
+        "identifier": [
+          {
+            "system": "https://radpilot.example/accession",
+            "value": "RP26000004",
+          },
+        ],
+        "issued": "2026-09-30T14:00:00.000Z",
+        "presentedForm": [
+          {
+            "contentType": "text/plain",
+            "data": "Q2xpbmljYWwgaW5kaWNhdGlvbjoKUHJlb3BlcmF0aXZlIGV2YWx1YXRpb24gYmVmb3JlIGVsZWN0aXZlIGxhcGFyb3Njb3BpYyBjaG9sZWN5c3RlY3RvbXkuCgpUZWNobmlxdWU6ClBBIGFuZCBsYXRlcmFsIHZpZXdzIG9mIHRoZSBjaGVzdC4KCkNvbXBhcmlzb246Ck5vbmUuCgpGaW5kaW5nczoKTGluZXMgYW5kIHR1YmVzOiBOb25lLgpMdW5nczogQ2xlYXIuIE5vIGZvY2FsIGNvbnNvbGlkYXRpb24uClBsZXVyYTogTm8gcGxldXJhbCBlZmZ1c2lvbiBvciBwbmV1bW90aG9yYXguCkhlYXJ0IGFuZCBtZWRpYXN0aW51bTogTm9ybWFsIGNhcmRpb21lZGlhc3RpbmFsIHNpbGhvdWV0dGUuCkJvbmVzOiBObyBhY3V0ZSBvc3Nlb3VzIGFibm9ybWFsaXR5LgoKSW1wcmVzc2lvbjoKTm8gYWN1dGUgY2FyZGlvcHVsbW9uYXJ5IGFibm9ybWFsaXR5Lg==",
+            "title": "XR chest, PA and lateral report",
+          },
+        ],
+        "resourceType": "DiagnosticReport",
+        "result": [
+          {
+            "reference": "urn:uuid:40000000-0000-4000-8000-000000000004-obs-1",
+          },
+        ],
+        "status": "final",
+        "subject": {
+          "display": "Laura Mitchell (46F)",
+          "reference": "urn:uuid:10000000-0000-4000-8000-000000000004",
+        },
+      },
+    },
+    {
+      "fullUrl": "urn:uuid:10000000-0000-4000-8000-000000000004",
+      "resource": {
+        "birthDate": "1980-01-15",
+        "gender": "female",
+        "id": "10000000-0000-4000-8000-000000000004",
+        "identifier": [
+          {
+            "system": "https://radpilot.example/mrn",
+            "value": "RP-100004",
+          },
+        ],
+        "name": [
+          {
+            "text": "Laura Mitchell",
+          },
+        ],
+        "resourceType": "Patient",
+      },
+    },
+    {
+      "fullUrl": "urn:uuid:40000000-0000-4000-8000-000000000004-obs-1",
+      "resource": {
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "imaging",
+                "display": "Imaging",
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+              },
+            ],
+          },
+        ],
+        "code": {
+          "coding": [
+            {
+              "code": "36643-5",
+              "display": "XR Chest",
+              "system": "http://loinc.org",
+            },
+          ],
+          "text": "Finding",
+        },
+        "id": "40000000-0000-4000-8000-000000000004-obs-1",
+        "resourceType": "Observation",
+        "status": "final",
+        "subject": {
+          "display": "Laura Mitchell (46F)",
+          "reference": "urn:uuid:10000000-0000-4000-8000-000000000004",
+        },
+        "valueString": "No acute cardiopulmonary abnormality.",
+      },
+    },
+  ],
+  "resourceType": "Bundle",
+  "timestamp": "<generated>",
+  "type": "collection",
+}
+`;

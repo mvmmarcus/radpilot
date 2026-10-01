@@ -33,8 +33,9 @@ added by a track must also be applied to the hosted project after merging:
 
 ## What Session 0 left in place (the contracts)
 
-- **Modules:** `src/modules/{studies,templates,reports,ai,copilot,guidelines,interop,audit}/`,
-  each with `domain/ application/ infrastructure/ ui/`.
+- **Modules:** `src/modules/{studies,templates,reports,ai,copilot,guidelines,interop,audit,viewer}/`,
+  each with `domain/ application/ infrastructure/ ui/`. (`viewer`, the DICOM stack viewer, was
+  added by Track D alongside `interop`.)
 - **Public entry points** (enforced by ESLint `no-restricted-imports`):
   - `@/modules/<name>`: domain types, zod schemas and pure functions. Safe anywhere.
   - `@/modules/<name>/server`: application use cases wired to infrastructure. Server only.

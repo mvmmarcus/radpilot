@@ -26,6 +26,7 @@
     "@ai-sdk/openai": "^3.0.123",
     "@ai-sdk/react": "^3.0.302",
     "@cornerstonejs/core": "^5.11.3",
+    "@cornerstonejs/dicom-image-loader": "^5.11.3",
     "@cornerstonejs/tools": "^5.11.3",
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/ssr": "^0.12.7",
