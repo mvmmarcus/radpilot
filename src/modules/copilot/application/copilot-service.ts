@@ -14,6 +14,8 @@ import type { CopilotReviewer } from "../domain/reviewer";
  */
 export interface CopilotIssueRepository {
   listOpenIssues(reportId: string): Promise<CopilotIssue[]>;
+  /** Issues already fixed, dismissed or acknowledged for the report (kept as history). */
+  listResolvedIssues(reportId: string): Promise<CopilotIssue[]>;
   /** Deletes all unresolved issues for the report, then inserts `drafts`. Returns the inserted rows. */
   replaceOpenIssues(reportId: string, drafts: CopilotIssueDraft[]): Promise<CopilotIssue[]>;
   resolveIssue(issueId: string, resolvedBy: string): Promise<void>;
@@ -65,7 +67,10 @@ export class CopilotService {
       patient: input.patient,
     });
 
-    const drafts = [...ruleDrafts, ...llmDrafts];
+    // An issue the radiologist already dismissed or acknowledged stays settled:
+    // re-running the rules on the next edit must not raise it again.
+    const settled = new Set((await this.issues.listResolvedIssues(input.reportId)).map(issueKey));
+    const drafts = [...ruleDrafts, ...llmDrafts].filter((draft) => !settled.has(issueKey(draft)));
     const issues = await this.issues.replaceOpenIssues(input.reportId, drafts);
 
     return { issues, hasBlockingOpen: issues.some((i) => i.severity === "blocking" && !i.resolved) };
@@ -91,6 +96,17 @@ export class CopilotService {
     await this.resolve(issue, resolvedBy);
   }
 
+  /**
+   * Acknowledges a blocking issue that has no fix to apply (a critical finding:
+   * the radiologist confirms it was communicated). Resolves it so signing can proceed.
+   */
+  async acknowledge(issue: Pick<CopilotIssue, "id" | "severity">, resolvedBy: string): Promise<void> {
+    if (issue.severity !== "blocking") {
+      throw new Error("Only blocking issues are acknowledged; dismiss this one instead.");
+    }
+    await this.resolve(issue, resolvedBy);
+  }
+
   private async resolve(issue: Pick<CopilotIssue, "id">, resolvedBy: string): Promise<void> {
     await this.issues.resolveIssue(issue.id, resolvedBy);
     await this.audit.record({
@@ -101,4 +117,8 @@ export class CopilotService {
       payload: {},
     });
   }
+}
+
+function issueKey(issue: Pick<CopilotIssueDraft, "ruleId" | "message">): string {
+  return `${issue.ruleId}|${issue.message}`;
 }

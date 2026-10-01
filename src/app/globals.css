@@ -131,3 +131,18 @@
     @apply font-sans;
   }
 }
+
+/* Report editor: each Tiptap reportSection node carries its label as an
+   attribute (report-section-extension.ts); show it as the section heading. */
+@layer components {
+  .ProseMirror {
+    @apply outline-none;
+  }
+  .ProseMirror section[data-report-section] {
+    @apply mb-4 min-h-12 rounded-md border border-border px-3 py-2;
+  }
+  .ProseMirror section[data-report-section]::before {
+    content: attr(label);
+    @apply mb-1 block text-xs font-medium tracking-wide text-muted-foreground uppercase;
+  }
+}

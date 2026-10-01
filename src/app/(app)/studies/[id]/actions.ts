@@ -8,7 +8,7 @@ import {
   SupabaseCopilotIssueRepository,
   type RunCopilotResult,
 } from "@/modules/copilot/server";
-import type { CopilotIssue, SuggestedFix } from "@/modules/copilot";
+import { applyFix, type CopilotIssue, type SuggestedFix } from "@/modules/copilot";
 import {
   amendReport,
   describeSignBlockReason,
@@ -103,9 +103,16 @@ export async function applyCopilotFixAction(params: ApplyFixParams): Promise<Act
       mockCopilotReviewer,
       new SupabaseAuditRecorder(supabase),
     );
-    const nextContent = await service.applyAndResolve(params.issue, params.fix, params.content, user.id);
+    // Save first: if the save is rejected (locked report, stale version) the
+    // issue must stay open rather than be resolved with no content change.
     const repo = new SupabaseReportRepository(supabase);
-    const report = await saveReportContent(repo, params.reportId, params.expectedVersion, nextContent);
+    const report = await saveReportContent(
+      repo,
+      params.reportId,
+      params.expectedVersion,
+      applyFix(params.content, params.fix),
+    );
+    await service.applyAndResolve(params.issue, params.fix, params.content, user.id);
     return { ok: true, data: report };
   } catch (error) {
     if (error instanceof ReportVersionConflictError) {
@@ -130,6 +137,31 @@ export async function dismissCopilotIssueAction(
     return { ok: true, data: null };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Failed to dismiss issue." };
+  }
+}
+
+/**
+ * Acknowledges a blocking issue with no fix to apply. For a critical finding
+ * (the radiologist confirms it was communicated) the report is also flagged
+ * as critical; other blocking issues are acknowledged as not applicable.
+ */
+export async function acknowledgeCopilotIssueAction(
+  reportId: string,
+  issue: Pick<CopilotIssue, "id" | "severity" | "category">,
+): Promise<ActionResult<Report | null>> {
+  try {
+    const { supabase, user } = await requireUser();
+    const service = new CopilotService(
+      new SupabaseCopilotIssueRepository(supabase),
+      mockCopilotReviewer,
+      new SupabaseAuditRecorder(supabase),
+    );
+    await service.acknowledge(issue, user.id);
+    if (issue.category !== "critical_finding") return { ok: true, data: null };
+    const report = await new SupabaseReportRepository(supabase).markCritical(reportId);
+    return { ok: true, data: report };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Failed to acknowledge issue." };
   }
 }
 

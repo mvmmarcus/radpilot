@@ -20,6 +20,7 @@ import type { PatientSex, Study } from "@/modules/studies";
 import type { Template } from "@/modules/templates";
 import type { LoadSeriesResult } from "@/modules/viewer/server";
 import {
+  acknowledgeCopilotIssueAction,
   amendReportAction,
   applyCopilotFixAction,
   dismissCopilotIssueAction,
@@ -201,6 +202,23 @@ export function ReadingRoom({
     }
   }, []);
 
+  const handleAcknowledge = useCallback(async (issue: CopilotIssue) => {
+    setBusy(true);
+    const result = await acknowledgeCopilotIssueAction(reportRef.current.id, {
+      id: issue.id,
+      severity: issue.severity,
+      category: issue.category,
+    });
+    setBusy(false);
+    if (result.ok) {
+      // Keep local content: only the version and critical flag change server-side.
+      if (result.data) setReport({ ...result.data, content: contentRef.current });
+      setIssues((prev) => prev.filter((i) => i.id !== issue.id));
+    } else if (result.error) {
+      toast.error("Could not acknowledge issue", { description: result.error });
+    }
+  }, []);
+
   const handleMarkPreliminary = useCallback(async () => {
     setBusy(true);
     const result = await markPreliminaryAction(reportRef.current.id);
@@ -250,7 +268,9 @@ export function ReadingRoom({
   const canExport = report.status === "final" || report.status === "amended";
 
   return (
-    <div className="flex flex-1 flex-col">
+    // Fixed to the viewport below the 3.5rem app header, so the panels fill the
+    // screen and scroll internally.
+    <div className="flex h-[calc(100svh-3.5rem)] flex-col">
       <div className="flex items-center justify-between gap-4 border-b bg-card px-4 py-2">
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm">
@@ -339,7 +359,12 @@ export function ReadingRoom({
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={20} minSize={15}>
             <div className="h-full p-3">
-              <CopilotPanel issues={issues} onApplyFix={handleApplyFix} onDismiss={handleDismiss} />
+              <CopilotPanel
+                issues={issues}
+                onApplyFix={disabled ? undefined : handleApplyFix}
+                onDismiss={disabled ? undefined : handleDismiss}
+                onAcknowledge={disabled ? undefined : handleAcknowledge}
+              />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>

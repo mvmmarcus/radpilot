@@ -47,6 +47,12 @@ function initCornerstone(): Promise<CornerstoneModules> {
 
       core.init();
       tools.init();
+      // Tools must be registered with the library before a tool group can add them.
+      tools.addTool(tools.PanTool);
+      tools.addTool(tools.ZoomTool);
+      tools.addTool(tools.StackScrollTool);
+      tools.addTool(tools.WindowLevelTool);
+      tools.addTool(tools.LengthTool);
 
       dicomImageLoader.init({ maxWebWorkers: Math.min(2, navigator.hardwareConcurrency || 1) });
 
@@ -174,10 +180,12 @@ export function DicomViewer({ series, seriesNumber = 1, onInsertMeasurement }: D
   // Listen for completed Length annotations to populate "Insert into Findings".
   useEffect(() => {
     const modules = modulesRef.current;
-    const element = elementRef.current;
-    if (!ready || !modules || !element) return;
+    if (!ready || !modules) return;
 
+    // Cornerstone dispatches annotation events on its global eventTarget, not
+    // on the viewport element.
     const { tools } = modules;
+    const { eventTarget } = modules.core;
 
     function handleAnnotationCompleted(evt: Event) {
       const detail = (evt as CustomEvent).detail as {
@@ -202,9 +210,9 @@ export function DicomViewer({ series, seriesNumber = 1, onInsertMeasurement }: D
       );
     }
 
-    element.addEventListener(tools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationCompleted as EventListener);
+    eventTarget.addEventListener(tools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationCompleted as EventListener);
     return () => {
-      element.removeEventListener(tools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationCompleted as EventListener);
+      eventTarget.removeEventListener(tools.Enums.Events.ANNOTATION_COMPLETED, handleAnnotationCompleted as EventListener);
     };
   }, [ready, series, seriesNumber]);
 
