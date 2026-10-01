@@ -2,8 +2,8 @@
 // (Supabase repositories, LLM adapters). Import from Server Components,
 // Server Functions and Route Handlers only.
 export {
-  exportReportAsFhir,
-  FHIR_EXPORTABLE_STATUSES,
-  type FhirExportResult,
-} from "./application/exportFhir";
-export { buildReportPdf, reportPdfFileName } from "./application/renderPdf";
+  loadSeriesForViewer,
+  type LoadedInstance,
+  type LoadedSeries,
+  type LoadSeriesResult,
+} from "./application/loadSeries";
