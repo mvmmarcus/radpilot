@@ -1,8 +1,9 @@
 # RadPilot
 
-AI-native radiology reporting MVP: a worklist, a DICOM viewer next to a structured report
-editor, streaming AI report generation from shorthand findings, and a hybrid copilot
-(deterministic safety rules + LLM review + guideline calculators). It exports FHIR R4
+AI-native radiology reporting MVP: a worklist, a reading room with a DICOM viewer next
+to a structured report editor and a copilot panel, streaming AI report generation from
+shorthand findings, and a hybrid copilot (deterministic safety rules + LLM review +
+guideline calculators). Reports go through a sign/amend lifecycle and export to FHIR R4
 and PDF.
 
 > Demo project. **Synthetic data only. Not for clinical use.**
@@ -15,8 +16,11 @@ Playwright.
 
 ## Status
 
-Built in sessions. See [docs/sessions.md](docs/sessions.md) for what is done, what's
-next, and a ready-to-paste prompt for each remaining session.
+All sessions (0, 0b, Docs, Tracks A-D, Session 5) are done: auth and worklist, templates
+and streaming AI generation, the copilot/guidelines/lifecycle, the DICOM viewer and FHIR/PDF
+export, and the reading room that wires them together. See
+[docs/sessions.md](docs/sessions.md) for how the work was split, and
+[docs/demo-script.md](docs/demo-script.md) for a 5-minute walkthrough of the seeded studies.
 
 ## Getting started (local)
 
@@ -70,15 +74,36 @@ a small dependency-free DICOM Part 10 writer (`scripts/dicom/part10-writer.ts`).
 Full walkthrough (local Supabase, OpenAI, hosted Supabase, Vercel) with a check after each
 stage: [docs/setup.md](docs/setup.md). `npm run verify:setup` tells you what's missing.
 
+### The reading room
+
+Opening a study from the worklist (`/studies/[id]`) loads a three-pane reading room
+(`src/app/(app)/studies/[id]/`):
+
+- **Viewer** (left) — Cornerstone3D stack viewer loaded from the seeded DICOM bucket,
+  with window/level presets, zoom/pan, stack scroll and a length tool. "Insert into
+  Findings" appends the measurement to the report's Findings section.
+- **Editor** (middle) — the Tiptap report editor. "Generate draft" streams an AI draft
+  from shorthand findings into the AI-assisted sections; edits autosave (debounced,
+  optimistic concurrency on `reports.version`).
+- **Copilot** (right) — every edit re-runs the deterministic rules engine (and the LLM
+  reviewer, when wired) after a short debounce; one-click fix, dismiss, and a blocking
+  banner for critical findings.
+
+The header has **Sign** (runs the sign gate first, with a friendly message if blocked),
+**Mark preliminary**, **Amend** (once final) and, once the report is final or amended,
+**Export FHIR** / **Export PDF** links to the Track D routes.
+
+Panels are resizable (shadcn's `resizable`, wrapping `react-resizable-panels`).
+
 ## Scripts
 
 | Script | What it does |
 |---|---|
 | `npm run check` | typecheck + lint + unit tests |
 | `npm run test` / `test:watch` | Vitest |
-| `npm run test:e2e` | Playwright (starts the dev server) |
-| `npm run eval` | AI eval suite (Session 5) |
-| `npm run db:start` / `db:stop` / `db:reset` | local Supabase (reset re-applies migrations + seed) |
+| `npm run test:e2e` | Playwright, including the reading-room happy path (`e2e/reading-room.spec.ts`) |
+| `npm run eval` | AI eval suite: 18 golden cases scored against the configured `LLMProvider` (`evals/`) |
+| `npm run db:start` / `db:stop` / `db:reset` | local Supabase (reset re-applies migrations + seed, the "reset to demo state" script) |
 | `npm run verify:setup` | check env, Supabase, seed, DICOM storage and OpenAI (`-- --env <file>`, `-- --live-ai`) |
 | `npm run db:types` | regenerate `src/lib/supabase/database.types.ts` |
 | `npm run dicom:generate` / `dicom:upload` | write the phantom DICOM series / upload them to Storage |
@@ -99,4 +124,6 @@ src/
 supabase/migrations/   schema, RLS, storage (invariants enforced in the DB)
 supabase/seed.sql      demo users, templates, synthetic patients and studies
 scripts/               phantom DICOM generator and uploader
+evals/                 golden cases, scorers and the eval runner (npm run eval)
+e2e/                   Playwright specs
 ```

@@ -52,6 +52,15 @@ describe("mockGenerateReport", () => {
     expect(report.recommendations[0]).toMatch(/Fleischner/);
   });
 
+  it("recommends Fleischner follow-up for measured nodules (plural)", () => {
+    const report = mockGenerateReport({
+      sections: [],
+      exam: baseExam,
+      shorthand: "Two solid pulmonary nodules right upper lobe 9mm",
+    });
+    expect(report.recommendations[0]).toMatch(/Fleischner/);
+  });
+
   it("recommends anticoagulation workup for PE", () => {
     const report = mockGenerateReport({ sections: [], exam: baseExam, shorthand: "acute PE in RLL artery" });
     expect(report.recommendations[0]).toMatch(/anticoagulation/);

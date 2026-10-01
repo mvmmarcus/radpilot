@@ -57,9 +57,9 @@ function hasMeasurement(clause: string): boolean {
   return /\d+(\.\d+)?\s*(mm|cm)\b/i.test(clause);
 }
 
-/** Mentions a pulmonary nodule, which gets a Fleischner-style follow-up recommendation. */
+/** Mentions a pulmonary nodule (singular or plural), which gets a Fleischner-style follow-up recommendation. */
 function isNodule(clause: string): boolean {
-  return /\bnodule\b/i.test(clause);
+  return /\bnodules?\b/i.test(clause);
 }
 
 function isPe(clause: string): boolean {
