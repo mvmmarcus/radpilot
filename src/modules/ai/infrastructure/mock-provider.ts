@@ -1,7 +1,6 @@
 import type { GeneratedReport, PartialGeneratedReport } from "../domain/generation";
 import type {
   LLMProvider,
-  ReviewReportInput,
   ReviewReportResult,
   StreamReportResult,
 } from "../application/provider";
@@ -175,8 +174,8 @@ export class MockLLMProvider implements LLMProvider {
     };
   }
 
-  async reviewReport(input: ReviewReportInput): Promise<ReviewReportResult> {
-    const sectionCount = Object.keys(input.sections).length;
-    return { notes: `Mock review: ${sectionCount} section(s) checked, no issues found.` };
+  /** The offline provider finds nothing, so tests and evals exercise only the deterministic rules. */
+  async reviewReport(): Promise<ReviewReportResult> {
+    return { findings: [], usage: {} };
   }
 }

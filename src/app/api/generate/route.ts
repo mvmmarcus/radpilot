@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import {
+  checkAiQuota,
   generateReportDraft,
   getLLMProvider,
   SupabaseGenerationLogRepository,
@@ -59,6 +60,13 @@ export async function POST(request: Request) {
 
   const provider = getLLMProvider();
   const log = new SupabaseGenerationLogRepository(supabase);
+
+  if (provider.name !== "mock") {
+    const quota = await checkAiQuota(log, user.id);
+    if (!quota.ok) {
+      return new Response(quota.message, { status: 429 });
+    }
+  }
 
   const generation = generateReportDraft(provider, log, {
     reportId: input.reportId,
