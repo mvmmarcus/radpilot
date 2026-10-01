@@ -1,7 +1,7 @@
-import { streamObject } from "ai";
+import { generateObject, streamObject } from "ai";
 import type { LanguageModel } from "ai";
-import { z } from "zod";
 import { GeneratedReportSchema } from "../domain/generation";
+import { ReviewResultSchema } from "../domain/review";
 import type {
   LLMProvider,
   ReviewReportInput,
@@ -9,10 +9,7 @@ import type {
   StreamReportResult,
 } from "../application/provider";
 import { buildReportDraftPrompt, type ReportDraftPromptInput } from "../application/prompts/report-draft.v1";
-
-const ReviewNotesSchema = z.object({
-  notes: z.string().describe("A short paragraph summarizing any inconsistencies found, or 'No issues found.'"),
-});
+import { buildReportReviewPrompt } from "../application/prompts/report-review.v1";
 
 /**
  * Shared streamObject-based implementation for any Vercel AI SDK v6
@@ -47,19 +44,18 @@ export class VercelAiLLMProvider implements LLMProvider {
   }
 
   async reviewReport(input: ReviewReportInput): Promise<ReviewReportResult> {
-    const sectionText = Object.entries(input.sections)
-      .map(([key, text]) => `${key}: ${text}`)
-      .join("\n\n");
+    const { system, prompt } = buildReportReviewPrompt(input);
 
-    const result = streamObject({
+    // Not streamed: the copilot needs the whole list before it can store issues.
+    const { object, usage } = await generateObject({
       model: this.languageModel,
-      schema: ReviewNotesSchema,
-      system:
-        "You review a radiology report draft for internal consistency (not a medical judgment). " +
-        "Summarize any inconsistencies you notice in one short paragraph of notes.",
-      prompt: sectionText,
+      schema: ReviewResultSchema,
+      system,
+      prompt,
     });
-    const object = await result.object;
-    return { notes: object.notes };
+    return {
+      findings: object.findings,
+      usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+    };
   }
 }

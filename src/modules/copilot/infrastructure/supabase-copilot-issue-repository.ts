@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import type { CopilotIssueRepository } from "../application/copilot-service";
-import type { CopilotIssue, CopilotIssueDraft } from "../domain/issue";
+import type { CopilotIssue, CopilotIssueDraft, IssueSource } from "../domain/issue";
 import { toCopilotIssue, toCopilotIssueInsert } from "./mappers";
 
 /**
@@ -35,12 +35,17 @@ export class SupabaseCopilotIssueRepository implements CopilotIssueRepository {
     return (data ?? []).map(toCopilotIssue);
   }
 
-  async replaceOpenIssues(reportId: string, drafts: CopilotIssueDraft[]): Promise<CopilotIssue[]> {
+  async replaceOpenIssues(
+    reportId: string,
+    drafts: CopilotIssueDraft[],
+    sources: readonly IssueSource[],
+  ): Promise<CopilotIssue[]> {
     const { error: deleteError } = await this.client
       .from("copilot_issues")
       .delete()
       .eq("report_id", reportId)
-      .eq("resolved", false);
+      .eq("resolved", false)
+      .in("source", [...sources]);
     if (deleteError) throw new Error(`Failed to clear open copilot issues: ${deleteError.message}`);
 
     if (drafts.length > 0) {

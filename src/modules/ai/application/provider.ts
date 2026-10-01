@@ -1,5 +1,7 @@
 import type { GeneratedReport, PartialGeneratedReport } from "../domain/generation";
+import type { ReviewFinding } from "../domain/review";
 import type { ReportDraftPromptInput } from "./prompts/report-draft.v1";
+import type { ReportReviewPromptInput } from "./prompts/report-review.v1";
 
 export interface StreamReportResult {
   /** Async iterable of partial objects; the last one satisfies GeneratedReportSchema. Used server-side (editor state, logging). */
@@ -17,13 +19,13 @@ export interface StreamReportResult {
   usage: Promise<{ inputTokens?: number; outputTokens?: number }>;
 }
 
-export interface ReviewReportInput {
-  sections: Record<string, string>;
-}
+export type ReviewReportInput = ReportReviewPromptInput;
 
 export interface ReviewReportResult {
-  /** Free-text review notes. The copilot module (Track C) interprets these. */
-  notes: string;
+  /** Consistency and clarity problems. The copilot module turns these into issues. */
+  findings: ReviewFinding[];
+  /** Undefined fields mean the provider did not report them. */
+  usage: { inputTokens?: number; outputTokens?: number };
 }
 
 /**

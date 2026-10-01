@@ -58,7 +58,7 @@ describe("generateReportDraft", () => {
           usage: Promise.resolve({}),
         };
       },
-      reviewReport: async () => ({ notes: "" }),
+      reviewReport: async () => ({ findings: [], usage: {} }),
     };
     const log = new InMemoryGenerationLog();
 

@@ -33,3 +33,10 @@ export { SupabaseGenerationLogRepository } from "./infrastructure/supabase-gener
 // Use cases.
 export { generateReportDraft, type GenerateReportDraftInput, type GenerateReportDraftResult } from "./application/generate-report-draft";
 export { recordGenerationOutcome } from "./application/record-generation-outcome";
+export { reviewReportDraft, type ReviewReportDraftInput } from "./application/review-report";
+export { AI_QUOTA, checkAiQuota, type AiQuotaResult, type GenerationCounter } from "./application/quota";
+export {
+  buildReportReviewPrompt,
+  REPORT_REVIEW_PROMPT_VERSION_ID,
+  type ReportReviewPromptInput,
+} from "./application/prompts/report-review.v1";

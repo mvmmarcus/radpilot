@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ReportContent } from "@/modules/reports";
-import type { CopilotIssue, CopilotIssueDraft } from "../domain/issue";
+import type { CopilotIssue, CopilotIssueDraft, IssueSource } from "../domain/issue";
 import type { CopilotReviewer } from "../domain/reviewer";
 import { mockCopilotReviewer } from "../domain/reviewer";
 import { CopilotService, type AuditRecorder, type CopilotIssueRepository } from "./copilot-service";
@@ -26,8 +26,12 @@ class InMemoryIssueRepository implements CopilotIssueRepository {
     return this.issues.filter((i) => i.reportId === reportId && i.resolved);
   }
 
-  async replaceOpenIssues(reportId: string, drafts: CopilotIssueDraft[]): Promise<CopilotIssue[]> {
-    this.issues = this.issues.filter((i) => i.reportId !== reportId || i.resolved);
+  async replaceOpenIssues(
+    reportId: string,
+    drafts: CopilotIssueDraft[],
+    sources: readonly IssueSource[],
+  ): Promise<CopilotIssue[]> {
+    this.issues = this.issues.filter((i) => i.reportId !== reportId || i.resolved || !sources.includes(i.source));
     const fresh: CopilotIssue[] = drafts.map((draft) => ({
       ...draft,
       id: `issue-${this.nextId++}`,
@@ -92,6 +96,28 @@ describe("CopilotService.run", () => {
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0]).toMatchObject({ source: "llm", message: llmDraft.message });
     expect(result.hasBlockingOpen).toBe(false);
+  });
+
+  it("skips the reviewer on a rules-only run and keeps the open LLM issues from the last review", async () => {
+    const repo = new InMemoryIssueRepository();
+    const llmDraft: CopilotIssueDraft = {
+      source: "llm",
+      ruleId: null,
+      severity: "warning",
+      category: "clarity",
+      message: "Impression contradicts the findings.",
+      span: null,
+      suggestedFix: null,
+    };
+    const reviewer: CopilotReviewer = { reviewReport: vi.fn(async () => [llmDraft]) };
+    const service = new CopilotService(repo, reviewer, new InMemoryAuditRecorder());
+    const content = contentWith({ findings: "Lungs are clear.", impression: "No acute abnormality." });
+
+    await service.run({ ...baseInput, content });
+    const second = await service.run({ ...baseInput, content }, { review: false });
+
+    expect(reviewer.reviewReport).toHaveBeenCalledTimes(1);
+    expect(second.issues.filter((i) => i.source === "llm")).toHaveLength(1);
   });
 
   it("replaces open issues on a second run but keeps resolved ones untouched", async () => {

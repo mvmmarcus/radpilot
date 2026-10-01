@@ -5,9 +5,21 @@ import type {
   GenerationLogEntry,
   GenerationLogRepository,
 } from "../application/generation-log";
+import type { GenerationCounter } from "../application/quota";
 
-export class SupabaseGenerationLogRepository implements GenerationLogRepository {
+export class SupabaseGenerationLogRepository implements GenerationLogRepository, GenerationCounter {
   constructor(private readonly client: SupabaseClient<Database>) {}
+
+  async countSince(since: Date, createdBy?: string): Promise<number> {
+    let query = this.client
+      .from("ai_generations")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", since.toISOString());
+    if (createdBy) query = query.eq("created_by", createdBy);
+    const { count, error } = await query;
+    if (error) throw new Error(`Failed to count ai_generations: ${error.message}`);
+    return count ?? 0;
+  }
 
   async logStart(entry: GenerationLogEntry): Promise<void> {
     const { error } = await this.client.from("ai_generations").insert({

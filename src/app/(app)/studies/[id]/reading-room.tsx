@@ -80,6 +80,7 @@ export function ReadingRoom({
   const [issues, setIssues] = useState<CopilotIssue[]>([]);
   const [signing, setSigning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
   const reportRef = useRef(report);
   const contentRef = useRef(content);
@@ -113,6 +114,29 @@ export function ReadingRoom({
     });
     if (result.ok && result.data) {
       setIssues(result.data.issues);
+    }
+  }, [study.modality, study.bodyPart, study.indication, patientSex, patientAgeYears]);
+
+  const handleRunReview = useCallback(async () => {
+    setReviewing(true);
+    const result = await runCopilotAction({
+      reportId: reportRef.current.id,
+      content: contentRef.current,
+      study: { modality: study.modality, bodyPart: study.bodyPart, indication: study.indication },
+      patient: { sex: patientSex, ageYears: patientAgeYears },
+      review: true,
+    });
+    setReviewing(false);
+    if (result.ok && result.data) {
+      setIssues(result.data.issues);
+      if (result.data.reviewError) {
+        toast.error("AI review failed", { description: result.data.reviewError });
+      } else {
+        const found = result.data.issues.filter((i) => !i.resolved && i.source === "llm").length;
+        toast.success(found > 0 ? `AI review: ${found} suggestion${found > 1 ? "s" : ""}` : "AI review found nothing to flag");
+      }
+    } else if (result.error) {
+      toast.error("AI review unavailable", { description: result.error });
     }
   }, [study.modality, study.bodyPart, study.indication, patientSex, patientAgeYears]);
 
@@ -364,6 +388,8 @@ export function ReadingRoom({
                 onApplyFix={disabled ? undefined : handleApplyFix}
                 onDismiss={disabled ? undefined : handleDismiss}
                 onAcknowledge={disabled ? undefined : handleAcknowledge}
+                onRunReview={disabled ? undefined : handleRunReview}
+                reviewing={reviewing}
               />
             </div>
           </ResizablePanel>

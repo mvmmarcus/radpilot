@@ -1,11 +1,20 @@
 "use server";
 
+import { logger } from "@/lib/logger";
 import { createClient } from "@/lib/supabase/server";
+import {
+  checkAiQuota,
+  getLLMProvider,
+  reviewReportDraft,
+  SupabaseGenerationLogRepository,
+} from "@/modules/ai/server";
 import { SupabaseAuditRecorder } from "@/modules/audit/server";
 import {
   CopilotService,
+  llmFindingsToDrafts,
   mockCopilotReviewer,
   SupabaseCopilotIssueRepository,
+  type CopilotReviewer,
   type RunCopilotResult,
 } from "@/modules/copilot/server";
 import { applyFix, type CopilotIssue, type SuggestedFix } from "@/modules/copilot";
@@ -63,24 +72,77 @@ export interface RunCopilotParams {
   content: ReportContent;
   study: { modality: Modality; bodyPart: BodyPart; indication: string };
   patient: { sex: PatientSex; ageYears: number };
+  /** Also run the LLM review. False for the debounced run after each edit, true when the radiologist asks for it. */
+  review?: boolean;
 }
 
-/** Runs the deterministic rules + LLM review over the current content (debounced from the client). */
-export async function runCopilotAction(params: RunCopilotParams): Promise<ActionResult<RunCopilotResult>> {
+export interface RunCopilotActionResult extends RunCopilotResult {
+  /** Set when the LLM review was asked for but failed; the deterministic rules still ran. */
+  reviewError?: string;
+}
+
+/**
+ * Runs the deterministic rules over the current content (debounced from the
+ * client), and the LLM review as well when `review` is set.
+ */
+export async function runCopilotAction(params: RunCopilotParams): Promise<ActionResult<RunCopilotActionResult>> {
   try {
-    const { supabase } = await requireUser();
+    const { supabase, user } = await requireUser();
+    const review = params.review ?? false;
+    const provider = getLLMProvider();
+    const log = new SupabaseGenerationLogRepository(supabase);
+
+    if (review && provider.name !== "mock") {
+      const quota = await checkAiQuota(log, user.id);
+      if (!quota.ok) return { ok: false, error: quota.message };
+    }
+
+    // The CopilotReviewer port never throws: a provider failure is reported
+    // next to the rule results instead of failing the whole run.
+    let reviewError: string | undefined;
+    const reviewer: CopilotReviewer = {
+      async reviewReport(input) {
+        try {
+          const findings = await reviewReportDraft(provider, log, {
+            reportId: params.reportId,
+            createdBy: user.id,
+            promptInput: {
+              sections: Object.fromEntries(
+                Object.entries(input.content.sections)
+                  .map(([key, section]) => [key, section?.text ?? ""])
+                  .filter(([, text]) => text.trim().length > 0),
+              ),
+              exam: {
+                modality: input.study.modality,
+                bodyPart: input.study.bodyPart,
+                indication: input.study.indication,
+                patientSex: input.patient.sex,
+                patientAgeYears: input.patient.ageYears,
+              },
+            },
+          });
+          return llmFindingsToDrafts(findings, input.content);
+        } catch (error) {
+          reviewError = "The AI review failed. The rule checks still ran.";
+          logger.error("copilot review failed", {
+            reportId: params.reportId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return [];
+        }
+      },
+    };
+
     const service = new CopilotService(
       new SupabaseCopilotIssueRepository(supabase),
-      mockCopilotReviewer,
+      review ? reviewer : mockCopilotReviewer,
       new SupabaseAuditRecorder(supabase),
     );
-    const result = await service.run({
-      reportId: params.reportId,
-      content: params.content,
-      study: params.study,
-      patient: params.patient,
-    });
-    return { ok: true, data: result };
+    const result = await service.run(
+      { reportId: params.reportId, content: params.content, study: params.study, patient: params.patient },
+      { review },
+    );
+    return { ok: true, data: { ...result, reviewError } };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Copilot run failed." };
   }

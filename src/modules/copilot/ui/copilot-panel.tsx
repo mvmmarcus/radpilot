@@ -35,6 +35,10 @@ export interface CopilotPanelProps {
   onDismiss?: (issue: CopilotIssue) => void;
   /** Called when the radiologist acknowledges a blocking issue that has no fix (a communicated critical finding). */
   onAcknowledge?: (issue: CopilotIssue) => void;
+  /** Called when the radiologist asks for the LLM review (it does not run on every edit). */
+  onRunReview?: () => void;
+  /** True while the LLM review is running. */
+  reviewing?: boolean;
   className?: string;
 }
 
@@ -43,7 +47,15 @@ export interface CopilotPanelProps {
  * while any critical/blocking issue is open, one-click fix for issues that
  * have a suggestedFix, and dismiss for non-blocking issues.
  */
-export function CopilotPanel({ issues, onApplyFix, onDismiss, onAcknowledge, className }: CopilotPanelProps) {
+export function CopilotPanel({
+  issues,
+  onApplyFix,
+  onDismiss,
+  onAcknowledge,
+  onRunReview,
+  reviewing = false,
+  className,
+}: CopilotPanelProps) {
   const open = issues.filter((i) => !i.resolved);
   const blockingOpen = open.filter((i) => isBlockingOpen(i));
   const grouped = ISSUE_SEVERITIES.map((severity) => ({
@@ -58,9 +70,14 @@ export function CopilotPanel({ issues, onApplyFix, onDismiss, onAcknowledge, cla
           <Sparkles className="size-4 text-muted-foreground" aria-hidden />
           Copilot
         </h2>
-        {open.length > 0 && (
-          <Badge variant="secondary">{open.length} open</Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {open.length > 0 && <Badge variant="secondary">{open.length} open</Badge>}
+          {onRunReview && (
+            <Button size="xs" variant="outline" onClick={onRunReview} disabled={reviewing}>
+              {reviewing ? "Reviewing…" : "AI review"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {blockingOpen.length > 0 && (

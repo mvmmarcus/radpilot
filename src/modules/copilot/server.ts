@@ -22,6 +22,7 @@ export {
 // Deterministic rules engine and pure applyFix.
 export { ALL_RULES } from "./domain/rules";
 export { applyFix } from "./domain/apply-fix";
+export { llmFindingsToDrafts } from "./domain/llm-findings";
 
 // CopilotService: runs rules + LLM review, replaces open issues, resolves/dismisses with audit.
 export {
@@ -29,6 +30,7 @@ export {
   type AuditRecorder as CopilotAuditRecorder,
   type CopilotIssueRepository,
   type RunCopilotInput,
+  type RunCopilotOptions,
   type RunCopilotResult,
 } from "./application/copilot-service";
 

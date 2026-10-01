@@ -2,7 +2,7 @@ import type { ReportContent } from "@/modules/reports";
 import type { BodyPart, Modality, PatientSex } from "@/modules/studies";
 import { ALL_RULES } from "../domain/rules";
 import { applyFix } from "../domain/apply-fix";
-import type { CopilotIssue, CopilotIssueDraft, RuleContext, SuggestedFix } from "../domain/issue";
+import type { CopilotIssue, CopilotIssueDraft, IssueSource, RuleContext, SuggestedFix } from "../domain/issue";
 import type { CopilotReviewer } from "../domain/reviewer";
 
 /**
@@ -16,8 +16,11 @@ export interface CopilotIssueRepository {
   listOpenIssues(reportId: string): Promise<CopilotIssue[]>;
   /** Issues already fixed, dismissed or acknowledged for the report (kept as history). */
   listResolvedIssues(reportId: string): Promise<CopilotIssue[]>;
-  /** Deletes all unresolved issues for the report, then inserts `drafts`. Returns the inserted rows. */
-  replaceOpenIssues(reportId: string, drafts: CopilotIssueDraft[]): Promise<CopilotIssue[]>;
+  /**
+   * Deletes the report's unresolved issues from `sources`, then inserts
+   * `drafts`. Returns every issue of the report (open and resolved).
+   */
+  replaceOpenIssues(reportId: string, drafts: CopilotIssueDraft[], sources: readonly IssueSource[]): Promise<CopilotIssue[]>;
   resolveIssue(issueId: string, resolvedBy: string): Promise<void>;
 }
 
@@ -39,6 +42,16 @@ export interface RunCopilotInput {
   patient: { sex: PatientSex; ageYears: number };
 }
 
+export interface RunCopilotOptions {
+  /**
+   * Also run the LLM review (default true). The reading room passes false for
+   * the run after each edit and true when the radiologist asks for a review,
+   * so a model call is not made on every keystroke; open LLM issues from the
+   * last review are kept across rules-only runs.
+   */
+  review?: boolean;
+}
+
 export interface RunCopilotResult {
   issues: CopilotIssue[];
   /** True if any open issue is severity "blocking" (signing should be blocked). */
@@ -57,21 +70,23 @@ export class CopilotService {
    * content, then replaces the report's open issues with the fresh result
    * (resolved issues are untouched: they remain as history).
    */
-  async run(input: RunCopilotInput): Promise<RunCopilotResult> {
+  async run(input: RunCopilotInput, { review = true }: RunCopilotOptions = {}): Promise<RunCopilotResult> {
     const ruleContext: RuleContext = { content: input.content, study: input.study, patient: input.patient };
 
     const ruleDrafts = ALL_RULES.flatMap((rule) => rule.run(ruleContext));
-    const llmDrafts = await this.reviewer.reviewReport({
-      content: input.content,
-      study: input.study,
-      patient: input.patient,
-    });
+    const llmDrafts = review
+      ? await this.reviewer.reviewReport({ content: input.content, study: input.study, patient: input.patient })
+      : [];
 
     // An issue the radiologist already dismissed or acknowledged stays settled:
     // re-running the rules on the next edit must not raise it again.
     const settled = new Set((await this.issues.listResolvedIssues(input.reportId)).map(issueKey));
     const drafts = [...ruleDrafts, ...llmDrafts].filter((draft) => !settled.has(issueKey(draft)));
-    const issues = await this.issues.replaceOpenIssues(input.reportId, drafts);
+    const issues = await this.issues.replaceOpenIssues(
+      input.reportId,
+      drafts,
+      review ? ["rule", "guideline", "llm"] : ["rule", "guideline"],
+    );
 
     return { issues, hasBlockingOpen: issues.some((i) => i.severity === "blocking" && !i.resolved) };
   }
