@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test("home page renders the app name", async ({ page }) => {
+test("signed-out visitors are redirected to the login page", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "RadPilot" })).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByText("Sign in to RadPilot")).toBeVisible();
 });
