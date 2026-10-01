@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+!.env.example
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# supabase local state and generated phantom DICOM (regenerate with npm run dicom:generate)
+/supabase/.branches
+/supabase/.temp
+/supabase/dicom/
