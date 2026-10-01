@@ -14,12 +14,12 @@ Docs session (any time) ───────┘
 | Session | Scope | Status |
 |---|---|---|
 | 0 | Scaffold, module skeleton, env, test configs, shared domain types, migrations + RLS | **done** |
-| 0b | Seed data, phantom DICOM, generated DB types, row mappers | next (blocks the tracks) |
+| 0b | Seed data, phantom DICOM, generated DB types, row mappers | **done** |
 | Docs | Domain primer, architecture, ADRs | can run any time, parallel |
-| A | Auth, app shell, worklist | after 0b |
-| B | Templates, AI provider port, Tiptap editor + streaming generation | after 0b |
-| C | Copilot rules, guidelines, sign/amend lifecycle | after 0b |
-| D | DICOM viewer, FHIR R4 + PDF export | after 0b |
+| A | Auth, app shell, worklist | next |
+| B | Templates, AI provider port, Tiptap editor + streaming generation | next |
+| C | Copilot rules, guidelines, sign/amend lifecycle | next |
+| D | DICOM viewer, FHIR R4 + PDF export | next |
 | 5 | Reading room layout, evals, Playwright happy path, README, demo script | after A to D |
 
 ## What Session 0 left in place (the contracts)
@@ -64,6 +64,31 @@ Docs session (any time) ───────┘
   `src/lib/supabase/{client,server,admin}.ts`, `src/lib/logger.ts` (no PHI in logs).
 - **Tooling:** `npm run check` (typecheck, lint, unit tests), `npm run test:e2e`,
   `npm run eval` (placeholder), `db:*` and `dicom:*` scripts in `package.json`.
+
+## What Session 0b added (the data)
+
+- **Seed** (`supabase/seed.sql`, runs on `npm run db:reset`): demo users
+  `radiologist@radpilot.test` and `admin@radpilot.test` (password `radpilot-demo`),
+  6 templates, 10 synthetic patients/studies (one per demo feature, see the README
+  table) and a signed final report for study 4. Fixed UUIDs:
+  users `a0000000-0000-4000-8000-0000000000NN`, patients `10000000-…-0000000000NN`,
+  studies `20000000-…-0000000000NN` (NN = study number 01-10), templates
+  `30000000-…-00000000000N` (1 ct-chest, 2 ct-head, 3 ct-abdomen-pelvis, 4 cr-chest,
+  5 us-thyroid, 6 mg-breast), report `40000000-0000-4000-8000-000000000004`.
+  `src/lib/supabase/seed.test.ts` parses the seed JSON with the domain schemas.
+- **Phantom DICOM:** `npm run dicom:generate` writes `supabase/dicom/<series>/0001.dcm…`
+  plus `manifest.json` (instances in reading order, UIDs, geometry, default window);
+  `npm run dicom:upload` puts them in the `dicom` bucket under `<series>/…`, which is
+  what `studies.dicom_path` holds. Series: `ct-chest-phantom`, `ct-head-phantom`,
+  `cr-chest-normal`, `cr-chest-pneumothorax`.
+- **DB types:** `src/lib/supabase/database.types.ts` (regenerate with `npm run db:types`
+  after a migration). Use `Tables<"studies">`, `TablesInsert<…>`, `Enums<…>`.
+- **Row mappers** (snake_case rows → zod-validated domain objects), exported from each
+  module's `server.ts`: studies `toPatient`, `toStudy`, `toWorklistItem` +
+  `WORKLIST_SELECT`; templates `toTemplate`; reports `toReport`, `toReportVersion`,
+  `toContentJson`; copilot `toCopilotIssue`, `toCopilotIssueInsert`. Timestamps are
+  normalized to ISO UTC by `toIsoDateTime` (`src/lib/supabase/mapping.ts`); a row that
+  breaks its schema throws `RowMappingError`.
 
 ## Rules for every session
 

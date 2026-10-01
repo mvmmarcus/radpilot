@@ -18,16 +18,53 @@ next, and a ready-to-paste prompt for each remaining session.
 
 ## Getting started (local)
 
-Requires Node 22 and the Supabase CLI (`brew install supabase/tap/supabase`, with Docker
-running).
+Requires Node 22, Docker (running) and the Supabase CLI.
 
 ```bash
+brew install supabase/tap/supabase
 npm install
-cp .env.example .env.local      # fill in the keys printed by the next command
-npm run db:start                # local Supabase (API on :54321, Studio on :54323)
-npm run db:reset                # apply migrations (+ seed, from Session 0b)
-npm run dev                     # http://localhost:3000
+cp .env.example .env.local
+npm run db:start          # local Supabase: API :54321, Studio :54323. Prints the keys.
 ```
+
+Fill `.env.local` with the values `db:start` printed (run `supabase status` to see them
+again): `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (publishable or anon key) and
+`SUPABASE_SERVICE_ROLE_KEY` (secret or service_role key). Then:
+
+```bash
+npm run db:reset          # apply migrations and supabase/seed.sql
+npm run dicom:generate    # write the synthetic phantom DICOM to supabase/dicom/ (gitignored)
+npm run dicom:upload      # upload it to the private `dicom` bucket (uses the service role key)
+npm run dev               # http://localhost:3000
+```
+
+Log in as the demo radiologist: **radiologist@radpilot.test** / **radpilot-demo**
+(an admin, admin@radpilot.test, has the same password).
+
+### Demo data
+
+`supabase/seed.sql` creates 2 users, 6 report templates (CT chest, CT head, CT
+abdomen/pelvis, chest radiograph, US thyroid, mammography) and 10 synthetic studies.
+Study times are relative to `now()`, so the worklist always looks fresh. Each study
+exists to demo one feature:
+
+| # | Exam | Patient | Priority | Demonstrates | Images |
+|---|---|---|---|---|---|
+| 1 | CTA chest | F 58 | STAT | Suspected PE: critical finding | `ct-chest-phantom` |
+| 2 | CT chest | M 64 | routine | Incidental nodule, 30 pack-years: Fleischner | `ct-chest-phantom` |
+| 3 | XR chest | M 71 | STAT | Left subclavian line, pneumothorax: critical + laterality | `cr-chest-pneumothorax` |
+| 4 | XR chest | F 45 | routine | Already signed (final): FHIR and PDF export | `cr-chest-normal` |
+| 5 | CT head | M 82 | STAT | Fall on anticoagulation, hemorrhage: critical + laterality | `ct-head-phantom` |
+| 6 | CT abdomen/pelvis | F 27 | urgent | Right lower quadrant pain: laterality + sex checks | |
+| 7 | CT abdomen/pelvis | M 59 | routine | Cirrhosis, HCC surveillance: LI-RADS | |
+| 8 | US thyroid | F 39 | routine | Palpable left nodule: TI-RADS + laterality | |
+| 9 | Mammography | F 52 | routine | Screening: BI-RADS | |
+| 10 | CT abdomen/pelvis | M 68 | urgent | Hematuria: sex-mismatch check | |
+
+The phantoms are drawn by `scripts/dicom/phantoms.ts` (a CTA chest with a right
+pulmonary artery filling defect and an 8 mm right lower lobe nodule, a head CT with a
+right subdural hematoma, and normal and pneumothorax chest radiographs) and written by
+a small dependency-free DICOM Part 10 writer (`scripts/dicom/part10-writer.ts`).
 
 ## Scripts
 
@@ -37,9 +74,9 @@ npm run dev                     # http://localhost:3000
 | `npm run test` / `test:watch` | Vitest |
 | `npm run test:e2e` | Playwright (starts the dev server) |
 | `npm run eval` | AI eval suite (Session 5) |
-| `npm run db:start` / `db:stop` / `db:reset` | local Supabase |
+| `npm run db:start` / `db:stop` / `db:reset` | local Supabase (reset re-applies migrations + seed) |
 | `npm run db:types` | regenerate `src/lib/supabase/database.types.ts` |
-| `npm run dicom:generate` / `dicom:upload` | synthetic phantom DICOM (Session 0b) |
+| `npm run dicom:generate` / `dicom:upload` | write the phantom DICOM series / upload them to Storage |
 
 ## Layout
 
@@ -55,4 +92,6 @@ src/
     index.ts           public domain entry point  -> @/modules/<name>
     server.ts          server-only entry point    -> @/modules/<name>/server
 supabase/migrations/   schema, RLS, storage (invariants enforced in the DB)
+supabase/seed.sql      demo users, templates, synthetic patients and studies
+scripts/               phantom DICOM generator and uploader
 ```
