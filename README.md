@@ -18,10 +18,9 @@ next, and a ready-to-paste prompt for each remaining session.
 
 ## Getting started (local)
 
-Requires Node 22, Docker (running) and the Supabase CLI.
+Requires Node 22 and Docker Desktop (running). The Supabase CLI is a dev dependency, installed by `npm install`.
 
 ```bash
-brew install supabase/tap/supabase
 npm install
 cp .env.example .env.local
 npm run db:start          # local Supabase: API :54321, Studio :54323. Prints the keys.

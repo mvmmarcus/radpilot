@@ -17,22 +17,31 @@ Vercel dashboard. Never paste keys into a chat.
 
 ## 1. Local Supabase
 
-Requires Docker Desktop (running) and the Supabase CLI.
+Requires Docker Desktop with the engine running (`open -a Docker`). The Supabase CLI is a
+dev dependency, so `npm install` installs it and the `npm run db:*` scripts use it (or call it
+directly with `npx supabase ...`). No Homebrew needed.
 
 ```bash
-brew install supabase/tap/supabase      # once
 cd ~/Documents/radpilot
+npm install
 npm run db:start                        # first run downloads images, a few minutes
 ```
 
-`db:start` prints the local URL and keys (again any time with `supabase status`).
-Create `.env.local`:
+`db:start` prints the local URL and keys (again any time with `npx supabase status`).
+Create `.env.local` and fill the Supabase values straight from the CLI, without the keys
+ever being shown:
 
 ```bash
-cp .env.example .env.local
+cp -n .env.example .env.local
+eval "$(npx supabase status -o env 2>/dev/null | grep -E '^(API_URL|ANON_KEY|SERVICE_ROLE_KEY)=')"
+sed -i '' \
+  -e "s|^NEXT_PUBLIC_SUPABASE_URL=.*|NEXT_PUBLIC_SUPABASE_URL=$API_URL|" \
+  -e "s|^NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=.*|NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY|" \
+  -e "s|^SUPABASE_SERVICE_ROLE_KEY=.*|SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY|" \
+  .env.local
 ```
 
-Fill in from the `supabase status` output:
+Or fill it by hand from the `npx supabase status` output:
 
 | `.env.local` | from `supabase status` |
 |---|---|
@@ -82,12 +91,12 @@ coordinate it.
    (São Paulo: `sa-east-1`). Save the database password in your password manager.
 2. Link and push the schema:
    ```bash
-   supabase login
-   supabase link --project-ref <project-ref>   # ref is in the project URL
-   supabase db push                            # applies supabase/migrations
+   npx supabase login
+   npx supabase link --project-ref <project-ref>   # ref is in the project URL
+   npx supabase db push                            # applies supabase/migrations
    ```
 3. Seed the demo data, either:
-   - `supabase db push --include-seed` (CLI runs `supabase/seed.sql`), or
+   - `npx supabase db push --include-seed` (CLI runs `supabase/seed.sql`), or
    - Dashboard → SQL Editor → paste `supabase/seed.sql` → Run.
 4. Keys: Project Settings → API Keys. Create `.env.production.local`:
    ```bash
@@ -110,7 +119,7 @@ coordinate it.
      `https://*-<your-vercel-team>.vercel.app/**` to redirect URLs for preview deploys.
 
 Re-seeding later: the seed uses fixed ids, so run it on a fresh project, or
-`supabase db reset --linked` (wipes the hosted DB: fine for a demo, never for real data).
+`npx supabase db reset --linked` (wipes the hosted DB: fine for a demo, never for real data).
 
 ## 4. Vercel
 
@@ -155,7 +164,9 @@ Notes:
 
 | Symptom | Fix |
 |---|---|
-| `db:start` hangs or fails | Docker Desktop running? `supabase stop --no-backup && npm run db:start` |
+| `failed to connect to the docker API` | Docker engine not running: `open -a Docker`, wait for "Engine running", retry |
+| `db:start` hangs or fails | `npx supabase stop --no-backup && npm run db:start` |
+| `brew install` fails (Xcode / permissions) | not needed: the CLI comes from `npm install` |
 | verify: sign-in failed | seed not applied: `npm run db:reset` (local) / stage 3 step 3 |
 | verify: 0 series in bucket | `npm run dicom:generate && npm run dicom:upload` |
 | verify: `AI_MODEL ... not available` | use one of the ids the check prints |
