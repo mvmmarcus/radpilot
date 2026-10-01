@@ -30,6 +30,17 @@ export const GeneratedReportSchema = z.object({
 });
 export type GeneratedReport = z.infer<typeof GeneratedReportSchema>;
 
+/**
+ * A partial, possibly-incomplete GeneratedReport, as streamed to the client
+ * by src/app/api/generate and consumed by @ai-sdk/react's useObject. List
+ * fields may contain `undefined` holes while an item is still arriving.
+ */
+export type PartialGeneratedReport = {
+  [K in keyof GeneratedReport]?: GeneratedReport[K] extends Array<infer Item>
+    ? Array<Item | undefined> | undefined
+    : GeneratedReport[K];
+};
+
 /** One logged model call (table ai_generations). Inputs and outputs may contain PHI: never log them elsewhere. */
 export const AiGenerationSchema = z.object({
   id: z.uuid(),
