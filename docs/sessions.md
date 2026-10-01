@@ -15,12 +15,21 @@ Docs session (any time) ───────┘
 |---|---|---|
 | 0 | Scaffold, module skeleton, env, test configs, shared domain types, migrations + RLS | **done** |
 | 0b | Seed data, phantom DICOM, generated DB types, row mappers | **done** |
+| Setup | Local Supabase, OpenAI (`gpt-4.1-mini`), hosted Supabase (São Paulo), Vercel at https://radpilot.vercel.app | **done** (see docs/setup.md) |
 | Docs | Domain primer, architecture, ADRs | can run any time, parallel |
 | A | Auth, app shell, worklist | next |
 | B | Templates, AI provider port, Tiptap editor + streaming generation | next |
 | C | Copilot rules, guidelines, sign/amend lifecycle | next |
 | D | DICOM viewer, FHIR R4 + PDF export | next |
 | 5 | Reading room layout, evals, Playwright happy path, README, demo script | after A to D |
+
+**Environments.** Local: `.env.local` (local Supabase, `AI_PROVIDER=mock` by default).
+Hosted: `.env.production.local` (project `jzceqdcakwaaxblslsiz`) and the same values in
+Vercel, minus the service role key. Every push to `main` deploys to production; every
+pushed track branch gets its own Preview URL against the hosted database. A migration
+added by a track must also be applied to the hosted project after merging:
+`npx supabase db push`. Check either environment with `npm run verify:setup`
+(`-- --env .env.production.local` for hosted) and `/api/health` on Vercel.
 
 ## What Session 0 left in place (the contracts)
 

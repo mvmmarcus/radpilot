@@ -6,6 +6,8 @@ editor, streaming AI report generation from shorthand findings, and a hybrid cop
 and PDF.
 
 > Demo project. **Synthetic data only. Not for clinical use.**
+>
+> Live: https://radpilot.vercel.app (demo login available on request)
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Supabase (Postgres, Auth, Storage,
 RLS) · Vercel AI SDK · Tiptap · Cornerstone3D · shadcn/ui + Tailwind v4 · Vitest ·
