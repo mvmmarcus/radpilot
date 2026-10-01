@@ -90,6 +90,21 @@ export function setAiSection(
   };
 }
 
+/**
+ * What a section should hold when a generated draft arrives and the section
+ * already had text the radiologist or the template put there (`kept`).
+ * Generation never destroys that text: Technique keeps the existing protocol
+ * description instead of the model's (returns null: leave the section alone);
+ * the other sections get the draft followed by what was already there (e.g. a
+ * measurement inserted from the viewer).
+ */
+export function combineGeneratedText(key: SectionKey, generated: string, kept: string | undefined): string | null {
+  const existing = kept?.trim() ?? "";
+  if (existing.length === 0) return generated;
+  if (key === "technique") return null;
+  return generated.includes(existing) ? generated : `${generated}\n${existing}`;
+}
+
 export function acceptAiSection(content: ReportContent, key: SectionKey): ReportContent {
   const current = content.sections[key];
   if (!current?.ai || current.ai.review !== "pending") return content;
