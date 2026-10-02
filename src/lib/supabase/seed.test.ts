@@ -1,7 +1,8 @@
 /**
- * Guards supabase/seed.sql against drift from the domain: the template and
- * report JSON in the seed must parse with TemplateSchema and ReportContentSchema,
- * and the demo studies must keep the shape the demo script relies on.
+ * Guards the seed against drift from the domain: the template JSON in
+ * supabase/seed.sql and the report JSON in the demo-data migration must parse
+ * with TemplateSchema and ReportContentSchema, and the demo studies must keep
+ * the shape the demo script relies on.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -11,8 +12,10 @@ import { BodyPartSchema, ModalitySchema, PatientSexSchema, StudyPrioritySchema }
 import { selectTemplate, TemplateSchema, type Template } from "@/modules/templates";
 import { SERIES_NAMES } from "../../../scripts/dicom/phantoms";
 
-const SEED_PATH = fileURLToPath(new URL("../../../supabase/seed.sql", import.meta.url));
-const seed = readFileSync(SEED_PATH, "utf8");
+// Users and templates live in seed.sql; patients, studies and reports in the
+// seed_demo_data() function, which seed.sql calls and reset_demo_data() re-runs.
+const read = (path: string) => readFileSync(fileURLToPath(new URL(`../../../supabase/${path}`, import.meta.url)), "utf8");
+const seed = `${read("seed.sql")}\n${read("migrations/20261002000000_demo_data.sql")}`;
 
 // --- A small reader for the seed's `insert into ... values (...)` statements ----
 
@@ -178,19 +181,14 @@ describe("seed.sql: patients and studies", () => {
     ["CT", "abdomen_pelvis", "urgent", "M", 68],
   ] as const;
 
-  it("has ten studies, each with a patient and a matching template", () => {
-    expect(studies).toHaveLength(10);
-    expect(patients).toHaveLength(10);
-    studies.forEach((study, i) => {
-      const [modality, bodyPart, priority, sex, age] = expected[i];
+  it("keeps the ten demo-script studies first, each with a patient and a matching template", () => {
+    expected.forEach(([modality, bodyPart, priority, sex, age], i) => {
+      const study = studies[i];
       const n = String(i + 1).padStart(2, "0");
       expect(study.id).toBe(`20000000-0000-4000-8000-0000000000${n}`);
-      expect(study.patient_id).toBe(`10000000-0000-4000-8000-0000000000${n}`);
       expect(ModalitySchema.parse(study.modality)).toBe(modality);
       expect(BodyPartSchema.parse(study.body_part)).toBe(bodyPart);
       expect(StudyPrioritySchema.parse(study.priority)).toBe(priority);
-      expect(study.study_date).toMatch(/^now\(\) - interval '/);
-      expect(selectTemplate(templates, { modality, bodyPart })).toBeDefined();
 
       const patient = patients.find((p) => p.id === study.patient_id)!;
       expect(PatientSexSchema.parse(patient.sex)).toBe(sex);
@@ -198,9 +196,25 @@ describe("seed.sql: patients and studies", () => {
     });
   });
 
+  it("has 25 studies with sequential ids, each with its own patient, a template and a relative time", () => {
+    expect(studies).toHaveLength(25);
+    expect(patients).toHaveLength(25);
+    studies.forEach((study, i) => {
+      const n = String(i + 1).padStart(2, "0");
+      expect(study.id).toBe(`20000000-0000-4000-8000-0000000000${n}`);
+      expect(study.accession).toBe(`RP260000${n}`);
+      expect(study.patient_id).toBe(`10000000-0000-4000-8000-0000000000${n}`);
+      expect(patients.some((p) => p.id === study.patient_id)).toBe(true);
+      expect(study.study_date).toMatch(/^now\(\) - interval '/);
+      StudyPrioritySchema.parse(study.priority);
+      const exam = { modality: ModalitySchema.parse(study.modality), bodyPart: BodyPartSchema.parse(study.body_part) };
+      expect(selectTemplate(templates, exam)).toBeDefined();
+    });
+  });
+
   it("points imaging studies at phantom series that dicom:generate writes", () => {
     const paths = studies.map((s) => s.dicom_path).filter((p) => p !== "null");
-    expect(paths).toEqual([
+    expect(paths.slice(0, 5)).toEqual([
       "ct-chest-phantom",
       "ct-chest-phantom",
       "cr-chest-pneumothorax",
@@ -211,10 +225,59 @@ describe("seed.sql: patients and studies", () => {
   });
 });
 
+describe("seed: reports", () => {
+  const byStudy = (n: number) => reports.find((r) => r.study_id.endsWith(String(n).padStart(2, "0")))!;
+  const parsed = (report: Row) => ({
+    content: ReportContentSchema.parse(JSON.parse(report.content)),
+    template: templates.find((t) => t.id === report.template_id)!,
+  });
+
+  it("gives every report valid content, its study's template and a seeded author", () => {
+    expect(reports).toHaveLength(11);
+    for (const report of reports) {
+      const study = studies.find((s) => s.id === report.study_id)!;
+      const { template } = parsed(report);
+      expect(`${template.modality}/${template.bodyPart}`).toBe(`${study.modality}/${study.body_part}`);
+      expect(Object.values(USERS)).toContain(report.created_by);
+    }
+  });
+
+  it("covers every report state a visitor can pick up from", () => {
+    const count = (status: string) => reports.filter((r) => r.status === status).length;
+    expect({ draft: count("draft"), preliminary: count("preliminary"), final: count("final") }).toEqual({
+      draft: 3,
+      preliminary: 2,
+      final: 6,
+    });
+    // Study 15 is inserted final and re-opened by an update, so the amend is in its history.
+    expect(seed).toMatch(/update public\.reports set status = 'amended' where id = '40000000-0000-4000-8000-000000000015'/);
+  });
+
+  it("seeds signed and preliminary reports complete, with no AI text pending", () => {
+    for (const report of reports.filter((r) => r.status !== "draft")) {
+      const { content, template } = parsed(report);
+      expect(missingRequiredSections(content, template)).toEqual([]);
+      expect(pendingAiSections(content)).toEqual([]);
+    }
+    for (const report of reports.filter((r) => r.status === "final")) {
+      expect(Object.values(USERS)).toContain(report.signed_by);
+      expect(report.signed_at).toMatch(/^now\(\)/);
+    }
+  });
+
+  it("seeds the drafts that demo the sign gate", () => {
+    expect(pendingAiSections(parsed(byStudy(11)).content)).toEqual(["findings", "impression"]);
+    expect(parsed(byStudy(12)).content.sections.findings?.text).toMatch(/pneumothorax/i);
+    const conflict = parsed(byStudy(22)).content.sections;
+    expect(conflict.findings?.text).toMatch(/left distal ureter/);
+    expect(conflict.impression?.text).toMatch(/right distal ureteral/);
+    expect(byStudy(14).is_critical).toBe("true");
+  });
+});
+
 describe("seed.sql: the signed report for study 4", () => {
   it("is inserted final, signed by the radiologist, with valid ReportContent", () => {
-    expect(reports).toHaveLength(1);
-    const report = reports[0];
+    const report = reports.find((r) => r.study_id === "20000000-0000-4000-8000-000000000004")!;
     expect(report.study_id).toBe("20000000-0000-4000-8000-000000000004");
     expect(report.status).toBe("final");
     expect(report.signed_by).toBe(USERS.radiologist);

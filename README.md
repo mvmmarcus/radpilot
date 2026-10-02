@@ -48,10 +48,17 @@ Log in as the demo radiologist: **radiologist@radpilot.test** / **radpilot-demo*
 
 ### Demo data
 
-`supabase/seed.sql` creates 2 users, 6 report templates (CT chest, CT head, CT
-abdomen/pelvis, chest radiograph, US thyroid, mammography) and 10 synthetic studies.
-Study times are relative to `now()`, so the worklist always looks fresh. Each study
-exists to demo one feature:
+`supabase/seed.sql` creates 2 users and 6 report templates (CT chest, CT head, CT
+abdomen/pelvis, chest radiograph, US thyroid, mammography), then calls
+`seed_demo_data()` for 25 synthetic studies. Study times are relative to `now()`, so
+the worklist always looks fresh.
+
+The demo has a shared login, so the studies are restored to this set every night at
+07:00 UTC by `reset_demo_data()` (pg_cron), and on demand from the admin's user menu
+(**Restore demo data**). Both live in
+`supabase/migrations/20261002000000_demo_data.sql`.
+
+Studies 1 to 10 each demo one feature, starting from an unread study:
 
 | # | Exam | Patient | Priority | Demonstrates | Images |
 |---|---|---|---|---|---|
@@ -65,6 +72,20 @@ exists to demo one feature:
 | 8 | US thyroid | F 39 | routine | Palpable left nodule: TI-RADS + laterality | |
 | 9 | Mammography | F 52 | routine | Screening: BI-RADS | |
 | 10 | CT abdomen/pelvis | M 68 | urgent | Hematuria: sex-mismatch check | |
+
+Studies 11 to 25 are the same exam types in other states, so a visitor can pick up
+anywhere in the workflow:
+
+| # | Exam | State | Demonstrates |
+|---|---|---|---|
+| 11 | CT chest | draft | AI draft pending review: Accept / Regenerate, sign gate |
+| 12 | XR chest | draft | Pneumothorax: signing blocked until the critical finding is acknowledged |
+| 13, 25 | CT head | preliminary | Ready to sign |
+| 14 | CTA chest | final, critical | Signed pulmonary embolism: critical flag on the PDF |
+| 15 | XR chest | amended | Re-opened after signing: edit and sign again |
+| 16, 17, 18 | CT abdomen/pelvis, US thyroid, mammography | final | Signed reports to export (TI-RADS, BI-RADS) |
+| 22 | CT abdomen/pelvis | draft | Left/right conflict between findings and impression |
+| 19, 20, 21, 23, 24 | CT head (STAT), XR chest, CT chest, US thyroid, mammography | unread | Start from scratch |
 
 The phantoms are drawn by `scripts/dicom/phantoms.ts` (a CTA chest with a right
 pulmonary artery filling defect and an 8 mm right lower lobe nodule, a head CT with a
