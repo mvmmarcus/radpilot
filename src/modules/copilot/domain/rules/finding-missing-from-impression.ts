@@ -7,13 +7,16 @@ import type { CopilotIssueDraft, CopilotRule, RuleContext } from "../issue";
  * a referring clinician actually reads.
  *
  * "Significant" is approximated by excluding common normal/negative phrasing
- * ("no ", "unremarkable", "within normal limits", "clear", "negative").
+ * ("no ", "none", "unremarkable", "within normal limits", "clear", "negative")
+ * and bare measurements inserted from the viewer ("8 mm, series 1 image 13"),
+ * which annotate a finding rather than state one.
  * Overlap is approximated by shared significant words (>=4 letters, ignoring
  * a short stop list) between a findings item and any impression item.
  */
 
 const NORMAL_PHRASES = [
   /\bno\b/i,
+  /\bnone\b/i,
   /\bunremarkable\b/i,
   /\bwithin normal limits\b/i,
   /\bclear\b/i,
@@ -40,7 +43,11 @@ const STOP_WORDS = new Set([
   "measures",
 ]);
 
+/** The text the viewer's "Insert into Findings" writes (viewer/domain/manifest.ts). */
+const VIEWER_MEASUREMENT = /^\d+(?:\.\d+)?\s*(?:mm|cm), series \d+ image \d+$/i;
+
 function isSignificant(item: string): boolean {
+  if (VIEWER_MEASUREMENT.test(item.trim())) return false;
   return !NORMAL_PHRASES.some((pattern) => pattern.test(item));
 }
 
