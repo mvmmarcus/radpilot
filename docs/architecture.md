@@ -52,9 +52,7 @@ A module is reached only through three entry points, each a barrel file
 | `@/modules/<name>/ui` | React components | anywhere components render |
 
 Inside a module, code uses relative imports; across modules, only these three paths are
-allowed. This is enforced by `eslint.config.mjs`
-(`/Users/marcus/Documents/radpilot/.claude/worktrees/agent-a195125b18674863e/eslint.config.mjs`),
-not by convention alone:
+allowed. This is enforced by `eslint.config.mjs`, not by convention alone:
 
 ```js
 // eslint.config.mjs:10-22 — reaching into another module's internals is an error
