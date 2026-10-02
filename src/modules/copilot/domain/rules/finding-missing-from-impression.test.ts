@@ -44,6 +44,14 @@ describe("finding-missing-from-impression rule", () => {
     expect(findingMissingFromImpressionRule.run({ ...baseCtx, content })).toEqual([]);
   });
 
+  it("does not flag 'None' statements or bare viewer measurements", () => {
+    const content = contentWith({
+      findings: "Lines and tubes: None.\nPleura: Right apical pneumothorax.\n8 mm, series 1 image 13",
+      impression: "Right apical pneumothorax.",
+    });
+    expect(findingMissingFromImpressionRule.run({ ...baseCtx, content })).toEqual([]);
+  });
+
   it("does nothing when findings or impression is empty", () => {
     const content = contentWith({ findings: "", impression: "" });
     expect(findingMissingFromImpressionRule.run({ ...baseCtx, content })).toEqual([]);
