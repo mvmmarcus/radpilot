@@ -482,6 +482,8 @@ export type Database = {
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
+      reset_demo_data: { Args: never; Returns: undefined }
+      seed_demo_data: { Args: never; Returns: undefined }
     }
     Enums: {
       ai_generation_kind: "report_draft" | "copilot_review"

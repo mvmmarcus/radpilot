@@ -118,8 +118,10 @@ coordinate it.
    - URL configuration: Site URL = your Vercel production URL (after stage 4), and add
      `https://*-<your-vercel-team>.vercel.app/**` to redirect URLs for preview deploys.
 
-Re-seeding later: the seed uses fixed ids, so run it on a fresh project, or
-`npx supabase db reset --linked` (wipes the hosted DB: fine for a demo, never for real data).
+Restoring the demo data later: sign in as the admin and choose **Restore demo data** in
+the user menu, or run `select public.reset_demo_data();` in the SQL Editor. It also runs
+every night at 07:00 UTC. It discards every study, report, AI log and audit event and
+re-creates the demo set; users, templates and images are untouched.
 
 ## 4. Vercel
 
